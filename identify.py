@@ -43,6 +43,28 @@ def load_database(filename):
     return conn, cursor
 
 
+def search_song(cursor, hashes):
+    # Prepare placeholders for the search hashes
+    placeholders = ', '.join(['?'] * len(hashes))
+
+    # Construct the SQL query to retrieve matching song_name and offset
+    query = """
+        SELECT song_name, offset
+        FROM songs
+        WHERE hash IN ({})
+    """.format(placeholders)
+
+    # Execute the query with the search hashes as parameters
+    cursor.execute(query, hashes)
+
+    # Fetch all the results
+    results = cursor.fetchall()
+
+    # Return the results
+    return results
+
+
+
 #main starts here
 db_file, input_file = get_input_values()
 print(f'DataBase file: {db_file}')
@@ -53,7 +75,29 @@ conn, cursor = load_database(db_file)
 warnings.filterwarnings("ignore", category=wavfile.WavFileWarning) #ignore warnings about metadata in wav files
 
 _, channels = wavfile.read(input_file) #get audio data
-
-
-
+channels = channels[:,0]
+print("Creating fingerprint for: "+input_file+"...")
+hashes, offsets=fp.generate_fingerprint(channels)   #generate hashes and offsets for the song
+print("Searching for matches...")
+relative_offsets = []
+matches = search_song(cursor, hashes)
+for i, (song_name, offset) in enumerate(matches):
+    search_offset = offsets[i]
+    relative_offsets.append((song_name, offset - search_offset))
 conn.close()    #close the connection to the database
+print("Possible hash matches= ",len(relative_offsets))            
+
+candidates = {}
+max_count=0
+candidate_name=''
+for song_name, offset in relative_offsets:
+    if song_name not in candidates:
+        candidates[song_name] = {}
+    if offset not in candidates[song_name]:
+        candidates[song_name][offset] = 0
+    candidates[song_name][offset] += 1
+    if candidates[song_name][offset] > max_count:
+        max_count = candidates[song_name][offset]
+        candidate_name = song_name
+
+print("Best candidate: ", candidate_name, " with ", max_count, " matches")

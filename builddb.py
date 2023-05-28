@@ -14,7 +14,6 @@ def create_database(filename):
     # Create a table to store the elements
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS songs (
-            song_id INTEGER ,
             hash TEXT,
             offset REAL,
             song_name TEXT
@@ -25,9 +24,11 @@ def create_database(filename):
     return conn, cursor
 
 
-def insert_element(conn, cursor, song_id, hash_value, offset, song_name):
-    cursor.execute("INSERT INTO songs (song_id, hash, offset, song_name) VALUES (?, ?, ?, ?)",
-                   (song_id, hash_value, offset, song_name))
+def insert_elements(conn, cursor, values):
+    query = "INSERT INTO songs (hash, offset, song_name) VALUES (?, ?, ?)"
+
+    # Execute the query in a batch
+    cursor.executemany(query, values)
     conn.commit()
 
 
@@ -68,11 +69,10 @@ def get_input_values():
 #main starts here
 
 input_folder, output_file = get_input_values()
-print(f'Populating DB with the songs from: {input_folder}')
-print(f'DB file name: {output_file}')
+print(f'\nPopulating DB with the songs from: {input_folder}')
+print(f'DB file name: {output_file}\n')
 warnings.filterwarnings("ignore", category=wavfile.WavFileWarning)  #ignore warnings about metadata in wav files
 conn, cursor=create_database(output_file)
-song_num=0
 # audio_file = 'library/02.FortheBetter.wav' 
 for filename in os.listdir(input_folder):
     if filename.endswith('.wav'):
@@ -81,17 +81,15 @@ for filename in os.listdir(input_folder):
         _, channels = wavfile.read(audio_file) #get audio data
         hashes_LR = []
         offsets_LR = []
-        # for ch in channels:
-        channels = channels[:,0] # select left channel only
-        #TODO: dual channel
-        hashes, offsets=fp.generate_fingerprint(channels)
-        hashes_LR.extend(hashes)
-        offsets_LR.extend(offsets)
+        for chan in range(0,2):
+            hashes, offsets=fp.generate_fingerprint(channels[:,chan])
+            hashes_LR.extend(hashes)
+            offsets_LR.extend(offsets)
         
-        for i in range(len(hashes_LR)):
-            insert_element(conn, cursor, song_num, hashes_LR[i], offsets_LR[i], filename)
-        
-        song_num+=1
-        # insert_element(conn, cursor, song_num, hashes[0], offsets[0], input_folder)
+        # Prepare a list of tuples containing the values to insert
+        values = [(hashes_LR[i], offsets_LR[i], filename) for i in range(len(hashes_LR))]
+        insert_elements(conn, cursor, values)
+
+
 save_database(conn) #117MB file if we only keep the left channel, block size 50, target zone 8
 print("All songs have been fingerprinted and inserted into the DB!")
