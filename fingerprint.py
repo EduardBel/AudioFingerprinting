@@ -11,8 +11,8 @@ def generate_fingerprint(channel):
     spectrogram = 10 * np.log10(spectrogram)  # transmorm linear output to dB scale 
     # spectrogram[spectrogram == -np.inf] = 0  # replace infs with zeros
     peak_points=generate_robust_constellation(spectrogram, freqs, times)
-    hashes=fast_combinatorial_hashing(peak_points)
-    return hashes
+    hashes, offsets=fast_combinatorial_hashing(peak_points)
+    return hashes, offsets
 
 
 
@@ -43,6 +43,7 @@ def generate_robust_constellation(spectrogram, freqs, times):
 
 def fast_combinatorial_hashing(peak_points):
     hashes = []
+    offsets = []
     for i in range(len(peak_points)):   #select anchor point
         for j in range(1, TARGET_ZONE): #select points in target zone
             if (i + j) < len(peak_points):  #if we are not out of range
@@ -52,9 +53,10 @@ def fast_combinatorial_hashing(peak_points):
                 freq2 = peak_points[i + j][0]
                 t_delta = time2 - time1 #calculate time difference
                 string_to_hash = f"{freq1}|{freq2}|{t_delta}"   #create a string to hash
+                offsets.append(time1)   #add offset to the list
                 # Generate a hash and add it to the list
                 hashes.append(hashlib.sha256(string_to_hash.encode()).hexdigest())
-    return hashes
+    return hashes, offsets
 
 
 

@@ -53,7 +53,9 @@ audio_file = 'library/02.FortheBetter.wav'
 _, channels = wavfile.read(audio_file) #get audio data
 channels = channels[:,0] # select left channel only
 #TODO: dual channel
-hashes=fp.generate_fingerprints(channels)
+hashes, offsets=fp.generate_fingerprint(channels)
+print(len(hashes))
+print(len(offsets))
 
 
 
