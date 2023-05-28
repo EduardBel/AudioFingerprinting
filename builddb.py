@@ -1,10 +1,39 @@
 import sys
-
-# for visualizing the data 
-# for opening the media file 
 import scipy.io.wavfile as wavfile
-
 import fingerprint as fp
+import sqlite3
+import os
+import warnings
+
+
+def create_database(filename):
+    # Connect to the database or create a new one if it doesn't exist
+    conn = sqlite3.connect(filename)
+    cursor = conn.cursor()
+
+    # Create a table to store the elements
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS songs (
+            song_id INTEGER ,
+            hash TEXT,
+            offset REAL,
+            song_name TEXT
+        )
+    ''')
+
+    # Return the connection and cursor
+    return conn, cursor
+
+
+def insert_element(conn, cursor, song_id, hash_value, offset, song_name):
+    cursor.execute("INSERT INTO songs (song_id, hash, offset, song_name) VALUES (?, ?, ?, ?)",
+                   (song_id, hash_value, offset, song_name))
+    conn.commit()
+
+
+def save_database(conn):
+    # Close the connection to the database
+    conn.close()
 
 
 def get_input_values():
@@ -36,37 +65,33 @@ def get_input_values():
     return input_folder, output_file
 
 
-
-
-
-
-
-
-
 #main starts here
+
 input_folder, output_file = get_input_values()
-print(f'Input folder: {input_folder}')
-print(f'Output file: {output_file}')
-
-audio_file = 'library/02.FortheBetter.wav' 
-
-_, channels = wavfile.read(audio_file) #get audio data
-channels = channels[:,0] # select left channel only
-#TODO: dual channel
-hashes, offsets=fp.generate_fingerprint(channels)
-print(len(hashes))
-print(len(offsets))
-
-
-
-# Plot the spectrogram with peak points marked
-# plt.figure()
-# plt.imshow(spectrogram, origin='lower', aspect='auto', extent=[times.min(), times.max(), freqs.min(), freqs.max()])
-# plt.colorbar(label='Amplitude (dB)')
-# plt.scatter([p[1] for p in peak_points], [p[0] for p in peak_points], color='red', s=10, label='Peak Points')
-# plt.xlabel('Time (s)')
-# plt.ylabel('Frequency (Hz)')
-# plt.title('Spectrogram with Peak Points')
-# plt.legend()
-# plt.show()
-
+print(f'Populating DB with the songs from: {input_folder}')
+print(f'DB file name: {output_file}')
+warnings.filterwarnings("ignore", category=wavfile.WavFileWarning)  #ignore warnings about metadata in wav files
+conn, cursor=create_database(output_file)
+song_num=0
+# audio_file = 'library/02.FortheBetter.wav' 
+for filename in os.listdir(input_folder):
+    if filename.endswith('.wav'):
+        audio_file = os.path.join(input_folder, filename)
+        print("Creating fingerprint for: "+filename+"...")        
+        _, channels = wavfile.read(audio_file) #get audio data
+        hashes_LR = []
+        offsets_LR = []
+        # for ch in channels:
+        channels = channels[:,0] # select left channel only
+        #TODO: dual channel
+        hashes, offsets=fp.generate_fingerprint(channels)
+        hashes_LR.extend(hashes)
+        offsets_LR.extend(offsets)
+        
+        for i in range(len(hashes_LR)):
+            insert_element(conn, cursor, song_num, hashes_LR[i], offsets_LR[i], filename)
+        
+        song_num+=1
+        # insert_element(conn, cursor, song_num, hashes[0], offsets[0], input_folder)
+save_database(conn) #117MB file if we only keep the left channel, block size 50, target zone 8
+print("All songs have been fingerprinted and inserted into the DB!")

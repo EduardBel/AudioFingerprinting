@@ -9,7 +9,7 @@ def generate_fingerprint(channel):
     #generate spectrogram
     spectrogram, freqs, times = mlab.specgram(channel,NFFT=window_size, Fs=SAMPLE_RATE, window=mlab.window_hanning, noverlap=window_overlap)
     spectrogram = 10 * np.log10(spectrogram)  # transmorm linear output to dB scale 
-    # spectrogram[spectrogram == -np.inf] = 0  # replace infs with zeros
+    spectrogram[spectrogram == -np.inf] = 0  # replace infinities with zeros
     peak_points=generate_robust_constellation(spectrogram, freqs, times)
     hashes, offsets=fast_combinatorial_hashing(peak_points)
     return hashes, offsets
@@ -62,5 +62,5 @@ def fast_combinatorial_hashing(peak_points):
 
 
 SAMPLE_RATE = 44100
-TARGET_ZONE = 8
+TARGET_ZONE = 8 # Adjust this value?
 BLOCK_SIZE = 50  # Adjust this value?
