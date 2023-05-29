@@ -4,19 +4,18 @@ import hashlib
 
 
 def generate_fingerprint(channel):
-    window_size = 2**12 #should be a power of 2
-    window_overlap = int (window_size * 0.5)
+    window_overlap = int (WINDOW_SIZE * 0.5)
     #generate spectrogram
-    spectrogram, freqs, times = mlab.specgram(channel,NFFT=window_size, Fs=SAMPLE_RATE, window=mlab.window_hanning, noverlap=window_overlap)
+    spectrogram, freqs, times = mlab.specgram(channel,NFFT=WINDOW_SIZE, Fs=SAMPLE_RATE, window=mlab.window_hanning, noverlap=window_overlap)
     spectrogram = 10 * np.log10(spectrogram)  # transmorm linear output to dB scale 
     spectrogram[spectrogram == -np.inf] = 0  # replace infinities with zeros
-    peak_points=generate_robust_constellation(spectrogram, freqs, times)
-    hashes, offsets=fast_combinatorial_hashing(peak_points)
+    peak_points=generate_robust_constellation(spectrogram, freqs, times)    #generate constellation
+    hashes, offsets=fast_combinatorial_hashing(peak_points) #generate hashes and offsets
     return hashes, offsets
 
 
 
-def generate_robust_constellation(spectrogram, freqs, times):
+def generate_robust_constellation(spectrogram, freqs, times):   #we will iterate through the spectrogram in blocks of size BLOCK_SIZE
     # Find points with higher amplitude within each block
     peak_points = []
 
@@ -47,7 +46,7 @@ def fast_combinatorial_hashing(peak_points):
     for i in range(len(peak_points)):   #select anchor point
         for j in range(1, TARGET_ZONE): #select points in target zone
             if (i + j) < len(peak_points):  #if we are not out of range
-                time1 = peak_points[i][1]   #get times of anchor point and point in target zone
+                time1 = peak_points[i][1]   #get times of anchor point and of point in target zone
                 time2 = peak_points[i + j][1]
                 freq1 = peak_points[i][0]   #get frequencies of anchor point and point in target zone
                 freq2 = peak_points[i + j][0]
@@ -62,5 +61,8 @@ def fast_combinatorial_hashing(peak_points):
 
 
 SAMPLE_RATE = 44100
-TARGET_ZONE = 8 # Adjust this value?
-BLOCK_SIZE = 50  # Adjust this value?
+
+# Constants I have chosen after some testing
+WINDOW_SIZE = 2**12 #should be a power of 2
+TARGET_ZONE = 8 
+BLOCK_SIZE = 30
